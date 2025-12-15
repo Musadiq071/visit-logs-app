@@ -1,0 +1,26 @@
+steps:
+  # Step 1: Install dependencies
+  - name: 'node:22'
+    entrypoint: npm
+    args: ['install']
+
+  # Step 2: Run database migrations
+  - name: 'gcr.io/cloud-builders/gcloud'
+    entrypoint: bash
+    args:
+      - '-c'
+      - |
+        echo "Fetching DATABASE_URL from Secret Manager..."
+        export DATABASE_URL=$(gcloud secrets versions access latest --secret=DATABASE_URL)
+        echo "Running migrations..."
+        npx sequelize-cli db:migrate
+
+  # Step 3: Deploy to App Engine
+  - name: 'gcr.io/cloud-builders/gcloud'
+    args: ['app', 'deploy', '--quiet']
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+timeout: '900s'
+
