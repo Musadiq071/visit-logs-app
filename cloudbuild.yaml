@@ -4,25 +4,44 @@ steps:
     entrypoint: npm
     args: ['install']
 
-  # Step 2: Run Sequelize migrations using Cloud SQL via DATABASE_URL
-  - name: 'node:22'
+  # Step 2: Run database migrations using Cloud SQL Proxy
+  - name: 'gcr.io/cloud-builders/gcloud'
     entrypoint: bash
-    secretEnv: ['DATABASE_URL']
+    secretEnv: ['DATABASE_URL_MIGRATIONS']
     args:
       - -c
       - |
-        echo "Running migrations with Cloud SQL..."
-        export NODE_ENV=production
-        npx sequelize-cli db:migrate
+        set -e
 
-  # Step 3: Deploy to Google App Engine
+        echo "Installing Node.js..."
+        apt-get update -qq
+        apt-get install -y -qq nodejs npm curl ca-certificates > /dev/null
+
+        echo "Downloading Cloud SQL Proxy..."
+        curl -sSL -o cloud-sql-proxy \
+          https://storage.googleapis.com/cloud-sql-connectors/cloud-sql-proxy/v2.14.2/cloud-sql-proxy.linux.amd64
+        chmod +x cloud-sql-proxy
+
+        echo "Starting Cloud SQL Proxy..."
+        ./cloud-sql-proxy visit-logs-app:europe-west2:visit-logs-postgres --port 5432 &
+        PROXY_PID=$!
+
+        sleep 5
+
+        echo "Running migrations..."
+        DATABASE_URL="$DATABASE_URL_MIGRATIONS" npx sequelize-cli db:migrate
+
+        echo "Stopping Cloud SQL Proxy..."
+        kill $PROXY_PID || true
+
+  # Step 3: Deploy to App Engine
   - name: 'gcr.io/cloud-builders/gcloud'
     args: ['app', 'deploy', '--quiet']
 
 availableSecrets:
   secretManager:
-    - versionName: projects/visit-logs-app/secrets/DATABASE_URL/versions/latest
-      env: DATABASE_URL
+    - versionName: projects/visit-logs-app/secrets/DATABASE_URL_MIGRATIONS/versions/latest
+      env: DATABASE_URL_MIGRATIONS
 
 options:
   logging: CLOUD_LOGGING_ONLY
