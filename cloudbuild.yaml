@@ -4,27 +4,27 @@ steps:
     entrypoint: npm
     args: ['install']
 
-  # Step 2: Run database migrations (DATABASE_URL injected)
+  # Step 2: Run Sequelize migrations using Cloud SQL via DATABASE_URL
   - name: 'node:22'
     entrypoint: bash
     secretEnv: ['DATABASE_URL']
     args:
       - -c
       - |
-        echo "Running migrations..."
+        echo "Running migrations with Cloud SQL..."
+        export NODE_ENV=production
         npx sequelize-cli db:migrate
 
-  # Step 3: Deploy to App Engine
+  # Step 3: Deploy to Google App Engine
   - name: 'gcr.io/cloud-builders/gcloud'
     args: ['app', 'deploy', '--quiet']
 
 availableSecrets:
   secretManager:
     - versionName: projects/visit-logs-app/secrets/DATABASE_URL/versions/latest
-      env: 'DATABASE_URL'
+      env: DATABASE_URL
 
 options:
   logging: CLOUD_LOGGING_ONLY
 
 timeout: '900s'
-
