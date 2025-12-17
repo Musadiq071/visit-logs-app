@@ -7,7 +7,8 @@ steps:
   # Step 2: Run database migrations using Cloud SQL Proxy
   - name: 'gcr.io/cloud-builders/gcloud'
     entrypoint: bash
-    secretEnv: ['DATABASE_URL_MIGRATIONS']
+    secretEnv:
+      - DATABASE_URL_MIGRATIONS
     args:
       - -c
       - |
@@ -24,7 +25,7 @@ steps:
 
         echo "Starting Cloud SQL Proxy..."
         ./cloud-sql-proxy visit-logs-app:europe-west2:visit-logs-postgres --port 5432 &
-        PROXY_PID=$!
+        PROXY_PID=$$!
 
         sleep 5
 
@@ -32,7 +33,7 @@ steps:
         DATABASE_URL="$$DATABASE_URL_MIGRATIONS" npx sequelize-cli db:migrate
 
         echo "Stopping Cloud SQL Proxy..."
-        kill $PROXY_PID || true
+        kill $$PROXY_PID || true
 
   # Step 3: Deploy to App Engine
   - name: 'gcr.io/cloud-builders/gcloud'
@@ -47,3 +48,4 @@ options:
   logging: CLOUD_LOGGING_ONLY
 
 timeout: '900s'
+
